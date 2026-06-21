@@ -1,8 +1,14 @@
 # visual-plan
 
+[![skills.sh](https://skills.sh/b/option-ai/visual-plan-skill)](https://skills.sh/option-ai/visual-plan-skill)
+
 A self-authored [Agent Skill](https://code.claude.com/docs/en/skills) that turns
 an ordinary text plan into a **rich, interactive, self-contained HTML document** —
 instead of a flat wall of Markdown in the terminal.
+
+```bash
+npx skills add option-ai/visual-plan-skill
+```
 
 **Live demo:** https://visual-plan-benchy-capture.abdulhdr1.workers.dev
 
