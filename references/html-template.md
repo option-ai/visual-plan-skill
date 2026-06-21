@@ -250,9 +250,60 @@ stable `data-anchor-id` + `data-anchor-label`.
   @media (max-width: 860px) {
     .dock-row { flex-wrap: wrap; justify-content: center; }
   }
+
+  /* ===== QOL ===== */
+  /* reading-progress bar + scroll-spy TOC */
+  .vp-progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; background: var(--accent); z-index: 70; transition: width .1s linear; }
+  nav.toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+  /* callout tone variants (default is warn) */
+  .callout.ok { border-left-color: var(--add); background: var(--add-bg); }
+  .callout.info { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout.risk { border-left-color: var(--del); background: var(--del-bg); }
+  /* copy-code button (JS wraps pre in .code-wrap) */
+  .code-wrap { position: relative; }
+  .code-wrap > .copy-code { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity .12s;
+    display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; cursor: pointer;
+    background: var(--card-2); color: var(--muted); border: 1px solid var(--line); border-radius: 7px; padding: 3px 8px; }
+  .code-wrap:hover > .copy-code { opacity: 1; }
+  .code-wrap > .copy-code:hover { color: var(--accent); border-color: var(--accent); }
+  /* images: zoomable, with lightbox */
+  main img { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; cursor: zoom-in; }
+  .vp-lightbox { position: fixed; inset: 0; z-index: 90; display: none; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.86); padding: 4vh 4vw; }
+  .vp-lightbox.open { display: flex; }
+  .vp-lightbox img { max-width: 92vw; max-height: 84vh; border-radius: 8px; cursor: zoom-out; }
+  .vp-lightbox .cap { color: #eee; font-size: 13px; margin-top: 12px; max-width: 70ch; text-align: center; }
+  /* chat: timestamps + per-message actions (edit/delete) */
+  .chat .msg .meta { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+  .chat .msg .acts { float: right; display: inline-flex; gap: 8px; opacity: 0; transition: opacity .12s; }
+  .chat .msg:hover .acts { opacity: .75; }
+  .chat .msg .acts button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
+  .chat .msg .acts button:hover { color: var(--accent); }
+  .chat .msg .edit-ta { width: 100%; min-height: 52px; resize: vertical; background: var(--card); color: var(--fg);
+    border: 1px solid var(--accent); border-radius: 7px; padding: 7px; font: inherit; font-size: 13px; margin-top: 4px; }
+  .chat .msg .edit-row { display: flex; gap: 7px; justify-content: flex-end; margin-top: 6px; }
+  /* honor reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+  /* print / save-as-PDF: clean static document */
+  @media print {
+    :root { --body: 100%; }
+    .dock, .vp-progress, .vp-lightbox, .kbd-help, .vp-toast, nav.toc, .copy-code { display: none !important; }
+    .wrap { max-width: 100%; padding: 0; }
+    .anno-badge, .has-anno { box-shadow: none !important; outline: none !important; }
+    details:not([open]) > *:not(summary) { display: revert; }  /* expand all */
+    details { border: 0; padding: 0; }
+    a[href^="http"]::after { content: " (" attr(href) ")"; font-size: .85em; color: #555; }
+    section, .card, .callout, .diagram, pre { break-inside: avoid; }
+    body { background: #fff; color: #111; }
+  }
 </style>
 </head>
 <body>
+
+<div class="vp-progress" id="vpProgress"></div>
 
 <!-- ===== Tabler UI icon sprite (MIT, stroke) ===== -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -291,6 +342,7 @@ stable `data-anchor-id` + `data-anchor-label`.
     <a href="#flow">Flow</a>
     <a href="#steps">Steps</a>
     <a href="#files">File map</a>
+    <a href="#risks">Risks</a>
     <a href="#questions">Open questions</a>
   </nav>
 
@@ -368,6 +420,13 @@ flowchart LR
       </ul>
     </section>
 
+    <!-- Callout tones: default (warn), .ok, .info, .risk. Images get a free lightbox. -->
+    <section id="risks" data-anchor-id="risks" data-anchor-label="Risks">
+      <h2>Risks</h2>
+      <div class="callout risk"><strong>Account bans.</strong> Unofficial APIs can flag accounts → mitigation.</div>
+      <div class="callout ok" style="margin-top:10px"><strong>Shipped.</strong> v1 is live behind a flag.</div>
+    </section>
+
     <!-- Open questions as answerable chips: one option per real choice, mark the
          recommended one [data-rec] (it's pre-selected). Answers export as Decisions. -->
     <section id="questions" data-anchor-id="questions" data-anchor-label="Open questions">
@@ -417,6 +476,9 @@ flowchart LR
     <button id="kbdBtn" title="All shortcuts"><svg class="icon"><use href="#i-keyboard"/></svg> <kbd>?</kbd></button>
   </div>
 </div>
+
+<!-- ===== Image lightbox ===== -->
+<div class="vp-lightbox" id="vpLightbox"><img alt=""><div class="cap"></div></div>
 
 <!-- ===== Keyboard help ===== -->
 <div class="kbd-help" id="kbdHelp" hidden>
@@ -527,6 +589,52 @@ flowchart LR
     if (li.hasAttribute('data-new')) span.insertAdjacentHTML('beforeend', ' <span class="tpill new">new</span>');
     if (li.hasAttribute('data-edit')) span.insertAdjacentHTML('beforeend', ' <span class="tpill edit">edit</span>');
   });
+
+  /* ---- Reading progress + scroll-spy TOC ---- */
+  var progress = document.getElementById('vpProgress');
+  var spySections = [].slice.call(document.querySelectorAll('main > section[id]'));
+  var tocLinks = {};
+  document.querySelectorAll('nav.toc a[href^="#"]').forEach(function (a) { tocLinks[a.getAttribute('href').slice(1)] = a; });
+  function onScroll() {
+    var h = document.documentElement, max = h.scrollHeight - h.clientHeight;
+    if (progress) progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  if ('IntersectionObserver' in window && spySections.length) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        var a = tocLinks[e.target.id]; if (!a) return;
+        if (e.isIntersecting) { Object.keys(tocLinks).forEach(function (k) { tocLinks[k].classList.remove('active'); }); a.classList.add('active'); }
+      });
+    }, { rootMargin: '-15% 0px -70% 0px' });
+    spySections.forEach(function (s) { io.observe(s); });
+  }
+
+  /* ---- Copy-code buttons on code/diff blocks ---- */
+  document.querySelectorAll('main pre:not(.mermaid)').forEach(function (pre) {
+    var wrap = document.createElement('div'); wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+    var b = document.createElement('button'); b.className = 'copy-code'; b.type = 'button';
+    b.innerHTML = '<svg class="icon"><use href="#i-copy"/></svg> Copy';
+    b.onclick = function () {
+      var text = (pre.innerText || pre.textContent || '').replace(/^\s*Copy\s*/, '');
+      var done = function () { b.innerHTML = 'Copied ✓'; setTimeout(function () { b.innerHTML = '<svg class="icon"><use href="#i-copy"/></svg> Copy'; }, 1200); };
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, done); else done();
+    };
+    wrap.appendChild(b);
+  });
+
+  /* ---- Image lightbox ---- */
+  var lb = document.getElementById('vpLightbox'), lbImg = lb && lb.querySelector('img'), lbCap = lb && lb.querySelector('.cap');
+  document.querySelectorAll('main img').forEach(function (img) {
+    img.addEventListener('click', function () {
+      if (!lb) return;
+      lbImg.src = img.currentSrc || img.src; lbImg.alt = img.alt || '';
+      lbCap.textContent = img.getAttribute('data-caption') || img.alt || '';
+      lb.classList.add('open');
+    });
+  });
+  if (lb) lb.addEventListener('click', function () { lb.classList.remove('open'); });
 
   /* ---- Theme ---- */
   var themeBtn = document.getElementById('themeBtn');
@@ -675,7 +783,37 @@ flowchart LR
     if (blk) { setTarget({ type: 'block', anchorId: blk.getAttribute('data-anchor-id'), anchorLabel: blk.getAttribute('data-anchor-label') }); genText.focus(); toast('Pinned to ' + blk.getAttribute('data-anchor-label')); }
   });
 
+  /* ---- Click a marked text span -> open its comment (marks are paint-only, so hit-test) ---- */
+  document.addEventListener('click', function (e) {
+    if (composing() || e.target.closest('.dock,.kbd-help,.vp-lightbox')) return;
+    var x = e.clientX, y = e.clientY, hit = null;
+    comments.forEach(function (c) {
+      if (hit || c.type !== 'text') return;
+      var b = sel(c.anchorId); if (!b) return;
+      var r = c._range || rangeFromOffsets(b, c.start, c.end); if (!r) return;
+      var rects = r.getClientRects();
+      for (var i = 0; i < rects.length; i++) {
+        var box = rects[i];
+        if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) { hit = c; break; }
+      }
+    });
+    if (hit) { openFeedback(); flashChat(hit); }
+  });
+
   /* ---- Render markers + chat ---- */
+  function timeAgo(ts) {
+    if (!ts) return '';
+    var diff = (Date.now() - new Date(ts).getTime()) / 1000;
+    if (diff < 45) return 'just now';
+    if (diff < 3600) return Math.round(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.round(diff / 3600) + 'h ago';
+    return Math.round(diff / 86400) + 'd ago';
+  }
+  function flashChat(c) {
+    var i = comments.indexOf(c); if (i < 0) return;
+    var node = document.querySelectorAll('#annoList .msg')[i];
+    if (node) { node.scrollIntoView({ behavior: 'smooth', block: 'center' }); node.classList.add('anno-flash'); setTimeout(function () { node.classList.remove('anno-flash'); }, 1300); }
+  }
   function render() {
     document.querySelectorAll('.anno-badge').forEach(function (n) { n.remove(); });
     document.querySelectorAll('.has-anno').forEach(function (n) { n.classList.remove('has-anno'); });
@@ -697,15 +835,30 @@ flowchart LR
       var gen = c.type === 'general' || c.anchorId === '__general__';
       var d = document.createElement('div'); d.className = 'msg' + (gen ? ' general' : '');
       var label = gen ? 'Whole plan' : (c.anchorLabel + (c.type === 'text' ? ' · text' : ''));
-      d.innerHTML = '<button class="del-c" title="Delete">&times;</button>' +
+      d.innerHTML = '<span class="acts"><button class="edit-c" title="Edit">&#9998;</button>' +
+          '<button class="del-c" title="Delete">&times;</button></span>' +
         '<div class="lbl">' + esc(label) + '</div>' +
         (c.quote ? '<div class="quote">“' + esc(c.quote) + '”</div>' : '') +
-        '<div class="body">' + esc(c.body) + '</div>';
+        '<div class="body">' + esc(c.body) + '</div>' +
+        '<div class="meta">' + esc(timeAgo(c.ts)) + (c.edited ? ' · edited' : '') + '</div>';
       if (!gen) d.querySelector('.lbl').onclick = function () { jumpTo(c); };
       d.querySelector('.del-c').onclick = function () { comments.splice(i, 1); save(); render(); };
+      d.querySelector('.edit-c').onclick = function () { startEdit(d, c); };
       list.appendChild(d);
     });
     refreshHighlights(null);
+  }
+  function startEdit(node, c) {
+    var bodyEl = node.querySelector('.body'); if (!bodyEl || node.querySelector('.edit-ta')) return;
+    bodyEl.style.display = 'none';
+    var ta = document.createElement('textarea'); ta.className = 'edit-ta'; ta.value = c.body;
+    var row = document.createElement('div'); row.className = 'edit-row';
+    row.innerHTML = '<button class="btn xs" data-x type="button">Cancel</button><button class="btn xs accent" data-ok type="button">Save</button>';
+    bodyEl.insertAdjacentElement('afterend', ta); ta.insertAdjacentElement('afterend', row); ta.focus();
+    function fin() { ta.remove(); row.remove(); bodyEl.style.display = ''; }
+    row.querySelector('[data-x]').onclick = fin;
+    row.querySelector('[data-ok]').onclick = function () { var v = ta.value.trim(); if (v) { c.body = v; c.edited = true; save(); render(); } else fin(); };
+    ta.onkeydown = function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') row.querySelector('[data-ok]').click(); if (e.key === 'Escape') { e.stopPropagation(); fin(); } };
   }
   function jumpTo(c) {
     var el = sel(c.anchorId); if (!el) return;
@@ -812,6 +965,16 @@ flowchart LR
   Mark the recommended option `data-rec` — it's **pre-selected by default** so the
   user approves by exception. Selections persist and export under "Decisions". Don't
   fall back to plain "Recommended default: …" prose.
+- **Callouts carry a tone:** default is warn; add `.ok` (green), `.info` (accent),
+  or `.risk` (red). Squared corners — don't round them.
+- **Images get a free lightbox.** Any `<img>` inside `main` is zoomable (click →
+  fullscreen, Esc/click to close); add `data-caption="…"` for a caption. Use real
+  `<img>` for screenshots rather than describing them.
+- **These reader features are automatic — don't re-implement:** scroll-spy TOC +
+  reading-progress bar, copy-code buttons on every `pre`, the image lightbox,
+  clickable text marks (click a highlight → its comment), comment edit + relative
+  timestamps, `prefers-reduced-motion`, and a print/PDF stylesheet (dock hidden,
+  details expanded, link URLs shown). Just author content; the plumbing handles it.
 - **Stable anchor ids** derived from content; feedback round-trips on them.
   General comments use the reserved `__general__` id and export as `[general]`.
 - **Brand logos:** `<svg class="brand" style="color:#BRAND"><use href="#b-NAME"/></svg>`.

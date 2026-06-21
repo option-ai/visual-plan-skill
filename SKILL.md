@@ -162,7 +162,16 @@ Required structure and behavior:
   mode). Never leave a relationship as plain prose when a diagram makes it legible;
   build nodes from elevated neutral surfaces, not flat accent-tinted boxes.
 - **Code / diffs** in styled `<pre><code>` blocks with a subtle file-path label.
-  Show added/removed lines with color, not just `+`/`-`.
+  Show added/removed lines with color, not just `+`/`-`. (A copy-code button is
+  added to every `pre` automatically.)
+- **Callouts carry a tone** — default warn, or `.ok`/`.info`/`.risk`; squared, not
+  rounded. Use real `<img>` for screenshots (they get a click-to-zoom lightbox;
+  add `data-caption`), not prose descriptions.
+- **Reader QOL is built into the template — don't reinvent it.** Scroll-spy TOC,
+  a reading-progress bar, copy-code buttons, the image lightbox, clickable text
+  marks (click a highlight → its comment), comment editing + relative timestamps,
+  `prefers-reduced-motion`, and a print/PDF stylesheet all ship in the template.
+  Author content; the plumbing is automatic.
 - **File map / tree as a rendered tree, never plain monospace text.** Use the
   template's file-tree renderer: a nested `<ul class="filetree">` with folder/file
   Tabler icons, indent guide lines, and `data-new`/`data-edit` status pills — so it
