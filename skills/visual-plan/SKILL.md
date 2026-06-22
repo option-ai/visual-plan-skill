@@ -326,24 +326,35 @@ Steps:
    }
    ```
 
-3. Deploy with the temporary-account flag (run from that directory; uses `npx` so
-   no global install is required):
+3. **Always deploy to a TEMPORARY account — never the user's logged-in account.**
+   `wrangler deploy --temporary` only provisions a throwaway account when wrangler
+   is *unauthenticated*; if the user is logged in, plain `--temporary` will use
+   their real account and deploy **permanently**, which is wrong. Force the
+   temporary flow by isolating wrangler's config (so it can't find the stored OAuth
+   token) and clearing the API-token env vars. Run from the plan directory:
 
    ```bash
-   npx wrangler@latest deploy --temporary
+   # stable per-plan config dir → redeploys reuse the SAME temp account/URL within the 60-min window
+   VP_CFG="${TMPDIR:-/tmp}/vp-wrangler/<slug>"; mkdir -p "$VP_CFG"
+   env -u CLOUDFLARE_API_TOKEN -u CF_API_TOKEN -u CLOUDFLARE_ACCOUNT_ID \
+     XDG_CONFIG_HOME="$VP_CFG" \
+     npx wrangler@latest deploy --temporary
    ```
 
-   If you run `wrangler deploy` without auth and without the flag, Wrangler prints
-   a notice about `--temporary`; just rerun with the flag. The first run
-   provisions a throwaway account, mints a token Wrangler caches locally, and
-   prints both a **live preview URL** (the deployed plan) and a **claim URL**.
+   This provisions a fresh temporary account regardless of the user's login. Output
+   shows `Temporary account ready … Claim within: 60 minutes`, a **Claim URL**, and
+   the **live `*.workers.dev` URL**. (Why it works: wrangler resolves its global
+   config via `XDG_CONFIG_HOME`; pointing it at an empty dir + unsetting the token
+   env vars makes wrangler unauthenticated, which is what triggers `--temporary`.)
+   **Never run a bare `wrangler deploy`** or `--temporary` without the isolation —
+   that uses the user's account.
 4. Give the user **both** URLs in chat: the live plan URL to open/share, and the
-   claim URL with a note that the deployment stays live for **60 minutes** and
-   they can click claim to make the account/Worker permanently theirs (otherwise
-   it auto-deletes). Quote the 60-minute window so the expiry is explicit.
-5. To push edits within the window, update `index.html` and rerun
-   `npx wrangler@latest deploy --temporary` from the same directory — it reuses
-   the cached temporary credentials and redeploys to the same URL.
+   claim URL — and state plainly that the deploy **auto-expires in 60 minutes**
+   (temporary by design; that's what the user wants) unless they click claim to keep
+   it. Quote the 60-minute window so the expiry is explicit.
+5. To push edits within the window, update `index.html` and rerun the **same
+   isolated command** (same `VP_CFG`) from the same directory — it reuses the
+   cached temporary account and redeploys to the same URL.
 
 If Wrangler errors (network, version, or a deploy failure), report what happened
 and fall back to handing over the local `file://` path; don't loop on retries.
